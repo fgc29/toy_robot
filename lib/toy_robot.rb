@@ -1,17 +1,44 @@
-ORIENTATION = %w(SOUTH WEST NORTH EAST)
-ORIENTATION_OPERATOR = %i[- - + +]
-
 class ToyRobot
-  def self.play(commands)
-    return p "PLACE the robot on Board" unless commands.include? 'PLACE'
+  ORIENTATION = %w(SOUTH WEST NORTH EAST)
+  ORIENTATION_OPERATOR = %i[- - + +]
+  X_MAX_BOUNDARY = 4
+  Y_MAX_BOUNDARY = 4
+  MIN_BOUNDARY = 0
+  ERROR_MSG = "PLACE the robot on the Board within the range of 0-4 for the x and y axis"
 
-    formatted_commands    = commands.split
-    formatted_commands[1] = formatted_commands[1].split(',')
-    game_start            = new()
+  class << self
+    def play(commands)
+      format_commands(commands)
 
-    game_start.place(*formatted_commands[1])
+      raise ERROR_MSG unless valid_commands?
 
-    formatted_commands[2..-1].each { |cmd| game_start.send(cmd.downcase.to_sym) }
+      game_start = new
+      game_start.place(*@commands[1])
+      @commands[2..-2].each {|cmd| game_start.send(cmd.downcase.to_sym)}
+      game_start.report
+    end
+
+    private
+
+    def format_commands(commands)
+      # @commands                    = commands.split
+      # place_command                = @commands.find_index('PLACE') || 0
+      # @commands[place_command + 1] = @commands[place_command + 1].split(',')
+      # @commands                    = @commands[place_command..-1]
+
+      @commands = commands.scan(/PLACE.+/).first&.split
+
+      raise ERROR_MSG unless @commands
+
+      @commands[1] = @commands[1].split(',')
+    end
+
+    def valid_commands?
+      @commands[1][0].to_i <= X_MAX_BOUNDARY &&
+          @commands[1][1].to_i <= Y_MAX_BOUNDARY &&
+          @commands[1][0].to_i >= MIN_BOUNDARY &&
+          @commands[1][1].to_i >= MIN_BOUNDARY
+    end
   end
 
   def place(x, y, direction)
@@ -20,72 +47,53 @@ class ToyRobot
     send(direction.downcase.to_sym)
   end
 
+  def report
+    "#{@x},#{@y},#{ORIENTATION[@orientation]}"
+  end
+
   private
 
   attr_accessor :x, :y, :orientation
 
-  def orientation(face)
-    @orientation = face
-  end
-
   def move
-    move_vertically? || move_horizontally?
-  end
-
-  def move_vertically?
-    move_vertically if ORIENTATION[@orientation] == "SOUTH" && @y > 0 || ORIENTATION[@orientation] == "NORTH" && @y < 4
-  end
-
-  def move_horizontally?
-    move_horizontally if ORIENTATION[@orientation] == "WEST" && @x < 4 || ORIENTATION[@orientation] == "EAST" && @x > 0
-  end
-
-  def move_vertically
-    @y = @y.send(ORIENTATION_OPERATOR[@orientation], 1)
-  end
-
-  def move_horizontally
-    @x = @x.send(ORIENTATION_OPERATOR[@orientation], 1)
+    move_vertically || move_horizontally
   end
 
   def left
-    if @orientation > 0
-      @orientation -= 1
-    else
-      @orientation = 3
-    end
+    @orientation = @orientation > 0 ? @orientation - 1 : 3
   end
 
   def right
-    if @orientation < 3
-      @orientation += 1
-    else
-      @orientation = 0
+    @orientation = @orientation < 3 ? @orientation + 1 : 0
+  end
+
+  ORIENTATION.each_with_index do |method, i|
+    define_method(method.downcase) do
+      @orientation = i
     end
   end
 
-  def south
-    @orientation = 0
+  def move_vertically?
+    ORIENTATION[@orientation] == "SOUTH" &&
+        @y > MIN_BOUNDARY ||
+        ORIENTATION[@orientation] == "NORTH" &&
+            @y < Y_MAX_BOUNDARY
   end
 
-  def west
-    @orientation = 1
+  def move_horizontally?
+    ORIENTATION[@orientation] == "WEST" &&
+        @x <= X_MAX_BOUNDARY &&
+        @x > MIN_BOUNDARY ||
+        ORIENTATION[@orientation] == "EAST" &&
+            @x >= MIN_BOUNDARY &&
+            @x < X_MAX_BOUNDARY
   end
 
-  def north
-    @orientation = 2
+  def move_vertically
+    @y = @y.send(ORIENTATION_OPERATOR[@orientation], 1) if move_vertically?
   end
 
-  def east
-    @orientation = 3
-  end
-
-  def report
-    p @x, @y, ORIENTATION[@orientation]
+  def move_horizontally
+    @x = @x.send(ORIENTATION_OPERATOR[@orientation], 1) if move_horizontally?
   end
 end
-
-ToyRobot.play('PLACE 0,0,NORTH MOVE REPORT')
-ToyRobot.play('PLACE 0,0,NORTH LEFT REPORT')
-ToyRobot.play('PLACE 1,2,EAST MOVE MOVE LEFT MOVE REPORT')
-ToyRobot.play('1,2,EAST MOVE MOVE LEFT MOVE REPORT')
